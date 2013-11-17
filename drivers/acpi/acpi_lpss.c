@@ -30,6 +30,7 @@ ACPI_MODULE_NAME("acpi_lpss");
 /* Offsets relative to LPSS_PRIVATE_OFFSET */
 #define LPSS_GENERAL			0x08
 #define LPSS_GENERAL_LTR_MODE_SW	BIT(2)
+#define LPSS_GENERAL_UART_RTS_OVRD	BIT(3)
 #define LPSS_SW_LTR			0x10
 #define LPSS_AUTO_LTR			0x14
 #define LPSS_TX_INT			0x20
@@ -68,11 +69,16 @@ struct lpss_private_data {
 
 static void lpss_uart_setup(struct lpss_private_data *pdata)
 {
-	unsigned int tx_int_offset = pdata->dev_desc->prv_offset + LPSS_TX_INT;
+	unsigned int offset;
 	u32 reg;
 
-	reg = readl(pdata->mmio_base + tx_int_offset);
-	writel(reg | LPSS_TX_INT_MASK, pdata->mmio_base + tx_int_offset);
+	offset = pdata->dev_desc->prv_offset + LPSS_TX_INT;
+	reg = readl(pdata->mmio_base + offset);
+	writel(reg | LPSS_TX_INT_MASK, pdata->mmio_base + offset);
+
+	offset = pdata->dev_desc->prv_offset + LPSS_GENERAL;
+	reg = readl(pdata->mmio_base + offset);
+	writel(reg | LPSS_GENERAL_UART_RTS_OVRD, pdata->mmio_base + offset);
 }
 
 static struct lpss_device_desc lpt_dev_desc = {
@@ -257,11 +263,12 @@ static int acpi_lpss_create_device(struct acpi_device *adev,
 				pdata->mmio_size = resource_size(&rentry->res);
 			pdata->mmio_base = ioremap(rentry->res.start,
 						   pdata->mmio_size);
-			pdata->dev_desc = dev_desc;
 			break;
 		}
 
 	acpi_dev_free_resource_list(&resource_list);
+
+	pdata->dev_desc = dev_desc;
 
 	if (dev_desc->clk_required) {
 		ret = register_device_clock(adev, pdata);

@@ -61,6 +61,7 @@ struct genl_family {
 	struct list_head	ops_list;	/* private */
 	struct list_head	family_list;	/* private */
 	struct list_head	mcast_groups;	/* private */
+	struct module		*module;
 };
 
 /**
@@ -121,21 +122,36 @@ struct genl_ops {
 	struct list_head	ops_list;
 };
 
-extern int genl_register_family(struct genl_family *family);
-extern int genl_register_family_with_ops(struct genl_family *family,
-	struct genl_ops *ops, size_t n_ops);
-extern int genl_unregister_family(struct genl_family *family);
-extern int genl_register_ops(struct genl_family *, struct genl_ops *ops);
-extern int genl_unregister_ops(struct genl_family *, struct genl_ops *ops);
-extern int genl_register_mc_group(struct genl_family *family,
-				  struct genl_multicast_group *grp);
-extern void genl_unregister_mc_group(struct genl_family *family,
-				     struct genl_multicast_group *grp);
-extern void genl_notify(struct sk_buff *skb, struct net *net, u32 portid,
-			u32 group, struct nlmsghdr *nlh, gfp_t flags);
+int __genl_register_family(struct genl_family *family);
+
+static inline int genl_register_family(struct genl_family *family)
+{
+	family->module = THIS_MODULE;
+	return __genl_register_family(family);
+}
+
+int __genl_register_family_with_ops(struct genl_family *family,
+				    struct genl_ops *ops, size_t n_ops);
+
+static inline int genl_register_family_with_ops(struct genl_family *family,
+	struct genl_ops *ops, size_t n_ops)
+{
+	family->module = THIS_MODULE;
+	return __genl_register_family_with_ops(family, ops, n_ops);
+}
+
+int genl_unregister_family(struct genl_family *family);
+int genl_register_ops(struct genl_family *, struct genl_ops *ops);
+int genl_unregister_ops(struct genl_family *, struct genl_ops *ops);
+int genl_register_mc_group(struct genl_family *family,
+			   struct genl_multicast_group *grp);
+void genl_unregister_mc_group(struct genl_family *family,
+			      struct genl_multicast_group *grp);
+void genl_notify(struct sk_buff *skb, struct net *net, u32 portid,
+		 u32 group, struct nlmsghdr *nlh, gfp_t flags);
 
 void *genlmsg_put(struct sk_buff *skb, u32 portid, u32 seq,
-				struct genl_family *family, int flags, u8 cmd);
+		  struct genl_family *family, int flags, u8 cmd);
 
 /**
  * genlmsg_nlhdr - Obtain netlink header from user specified header

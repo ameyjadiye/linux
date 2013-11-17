@@ -66,6 +66,9 @@ int hugetlb_reserve_pages(struct inode *inode, long from, long to,
 						vm_flags_t vm_flags);
 void hugetlb_unreserve_pages(struct inode *inode, long offset, long freed);
 int dequeue_hwpoisoned_huge_page(struct page *page);
+bool isolate_huge_page(struct page *page, struct list_head *list);
+void putback_active_hugepage(struct page *page);
+bool is_hugepage_active(struct page *page);
 void copy_huge_page(struct page *dst, struct page *src);
 
 #ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
@@ -134,6 +137,9 @@ static inline int dequeue_hwpoisoned_huge_page(struct page *page)
 	return 0;
 }
 
+#define isolate_huge_page(p, l) false
+#define putback_active_hugepage(p)	do {} while (0)
+#define is_hugepage_active(x)	false
 static inline void copy_huge_page(struct page *dst, struct page *src)
 {
 }
@@ -261,6 +267,8 @@ struct huge_bootmem_page {
 };
 
 struct page *alloc_huge_page_node(struct hstate *h, int nid);
+struct page *alloc_huge_page_noerr(struct vm_area_struct *vma,
+				unsigned long addr, int avoid_reserve);
 
 /* arch callback */
 int __init alloc_bootmem_huge_page(struct hstate *h);
@@ -371,14 +379,38 @@ static inline pgoff_t basepage_index(struct page *page)
 	return __basepage_index(page);
 }
 
+extern void dissolve_free_huge_pages(unsigned long start_pfn,
+				     unsigned long end_pfn);
+int pmd_huge_support(void);
+/*
+ * Currently hugepage migration is enabled only for pmd-based hugepage.
+ * This function will be updated when hugepage migration is more widely
+ * supported.
+ */
+static inline int hugepage_migration_support(struct hstate *h)
+{
+	return pmd_huge_support() && (huge_page_shift(h) == PMD_SHIFT);
+}
+
+static inline spinlock_t *huge_pte_lockptr(struct hstate *h,
+					   struct mm_struct *mm, pte_t *pte)
+{
+	if (huge_page_size(h) == PMD_SIZE)
+		return pmd_lockptr(mm, (pmd_t *) pte);
+	VM_BUG_ON(huge_page_size(h) == PAGE_SIZE);
+	return &mm->page_table_lock;
+}
+
 #else	/* CONFIG_HUGETLB_PAGE */
 struct hstate {};
 #define alloc_huge_page_node(h, nid) NULL
+#define alloc_huge_page_noerr(v, a, r) NULL
 #define alloc_bootmem_huge_page(h) NULL
 #define hstate_file(f) NULL
 #define hstate_sizelog(s) NULL
 #define hstate_vma(v) NULL
 #define hstate_inode(i) NULL
+#define page_hstate(page) NULL
 #define huge_page_size(h) PAGE_SIZE
 #define huge_page_mask(h) PAGE_MASK
 #define vma_kernel_pagesize(v) PAGE_SIZE
@@ -396,6 +428,25 @@ static inline pgoff_t basepage_index(struct page *page)
 {
 	return page->index;
 }
+#define dissolve_free_huge_pages(s, e)	do {} while (0)
+#define pmd_huge_support()	0
+#define hugepage_migration_support(h)	0
+
+static inline spinlock_t *huge_pte_lockptr(struct hstate *h,
+					   struct mm_struct *mm, pte_t *pte)
+{
+	return &mm->page_table_lock;
+}
 #endif	/* CONFIG_HUGETLB_PAGE */
+
+static inline spinlock_t *huge_pte_lock(struct hstate *h,
+					struct mm_struct *mm, pte_t *pte)
+{
+	spinlock_t *ptl;
+
+	ptl = huge_pte_lockptr(h, mm, pte);
+	spin_lock(ptl);
+	return ptl;
+}
 
 #endif /* _LINUX_HUGETLB_H */

@@ -207,7 +207,7 @@ static int iguanair_send(struct iguanair *ir, unsigned size)
 {
 	int rc;
 
-	INIT_COMPLETION(ir->completion);
+	reinit_completion(&ir->completion);
 
 	ir->urb_out->transfer_buffer_length = size;
 	rc = usb_submit_urb(ir->urb_out, GFP_KERNEL);
@@ -364,8 +364,8 @@ static int iguanair_tx(struct rc_dev *dev, unsigned *txbuf, unsigned count)
 		periods = DIV_ROUND_CLOSEST(txbuf[i] * ir->carrier, 1000000);
 		bytes = DIV_ROUND_UP(periods, 127);
 		if (size + bytes > ir->bufsize) {
-			count = i;
-			break;
+			rc = -EINVAL;
+			goto out;
 		}
 		while (periods > 127) {
 			ir->packet->payload[size++] = 127 | space;

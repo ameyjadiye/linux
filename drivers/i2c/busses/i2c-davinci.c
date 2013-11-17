@@ -38,10 +38,7 @@
 #include <linux/slab.h>
 #include <linux/cpufreq.h>
 #include <linux/gpio.h>
-#include <linux/of_i2c.h>
 #include <linux/of_device.h>
-
-#include <mach/hardware.h>
 #include <linux/platform_data/i2c-davinci.h>
 
 /* ----- global defines ----------------------------------------------- */
@@ -326,7 +323,7 @@ i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
 
 	davinci_i2c_write_reg(dev, DAVINCI_I2C_CNT_REG, dev->buf_len);
 
-	INIT_COMPLETION(dev->cmd_complete);
+	reinit_completion(&dev->cmd_complete);
 	dev->cmd_err = 0;
 
 	/* Take I2C out of reset and configure it as master */
@@ -665,7 +662,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
 #endif
 	dev->dev = &pdev->dev;
 	dev->irq = irq->start;
-	dev->pdata = dev->dev->platform_data;
+	dev->pdata = dev_get_platdata(&pdev->dev);
 	platform_set_drvdata(pdev, dev);
 
 	if (!dev->pdata && pdev->dev.of_node) {
@@ -728,7 +725,6 @@ static int davinci_i2c_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failure adding adapter\n");
 		goto err_unuse_clocks;
 	}
-	of_i2c_register_devices(adap);
 
 	return 0;
 

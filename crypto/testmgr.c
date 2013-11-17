@@ -179,7 +179,7 @@ static int do_one_async_hash_op(struct ahash_request *req,
 		ret = wait_for_completion_interruptible(&tr->completion);
 		if (!ret)
 			ret = tr->err;
-		INIT_COMPLETION(tr->completion);
+		reinit_completion(&tr->completion);
 	}
 	return ret;
 }
@@ -336,7 +336,7 @@ static int __test_hash(struct crypto_ahash *tfm, struct hash_testvec *template,
 				ret = wait_for_completion_interruptible(
 					&tresult.completion);
 				if (!ret && !(ret = tresult.err)) {
-					INIT_COMPLETION(tresult.completion);
+					reinit_completion(&tresult.completion);
 					break;
 				}
 				/* fall through */
@@ -543,7 +543,7 @@ static int __test_aead(struct crypto_aead *tfm, int enc,
 				ret = wait_for_completion_interruptible(
 					&result.completion);
 				if (!ret && !(ret = result.err)) {
-					INIT_COMPLETION(result.completion);
+					reinit_completion(&result.completion);
 					break;
 				}
 			case -EBADMSG:
@@ -697,7 +697,7 @@ static int __test_aead(struct crypto_aead *tfm, int enc,
 				ret = wait_for_completion_interruptible(
 					&result.completion);
 				if (!ret && !(ret = result.err)) {
-					INIT_COMPLETION(result.completion);
+					reinit_completion(&result.completion);
 					break;
 				}
 			case -EBADMSG:
@@ -983,7 +983,7 @@ static int __test_skcipher(struct crypto_ablkcipher *tfm, int enc,
 				ret = wait_for_completion_interruptible(
 					&result.completion);
 				if (!ret && !((ret = result.err))) {
-					INIT_COMPLETION(result.completion);
+					reinit_completion(&result.completion);
 					break;
 				}
 				/* fall through */
@@ -1086,7 +1086,7 @@ static int __test_skcipher(struct crypto_ablkcipher *tfm, int enc,
 				ret = wait_for_completion_interruptible(
 					&result.completion);
 				if (!ret && !((ret = result.err))) {
-					INIT_COMPLETION(result.completion);
+					reinit_completion(&result.completion);
 					break;
 				}
 				/* fall through */
@@ -2043,6 +2043,16 @@ static const struct alg_test_desc alg_test_descs[] = {
 			.hash = {
 				.vecs = crc32c_tv_template,
 				.count = CRC32C_TEST_VECTORS
+			}
+		}
+	}, {
+		.alg = "crct10dif",
+		.test = alg_test_hash,
+		.fips_allowed = 1,
+		.suite = {
+			.hash = {
+				.vecs = crct10dif_tv_template,
+				.count = CRCT10DIF_TEST_VECTORS
 			}
 		}
 	}, {
@@ -3224,7 +3234,7 @@ int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
 	if (i >= 0)
 		rc |= alg_test_descs[i].test(alg_test_descs + i, driver,
 					     type, mask);
-	if (j >= 0)
+	if (j >= 0 && j != i)
 		rc |= alg_test_descs[j].test(alg_test_descs + j, driver,
 					     type, mask);
 
