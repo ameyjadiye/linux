@@ -35,6 +35,8 @@
 #include "ocrdma_ah.h"
 #include "ocrdma_hw.h"
 
+#define OCRDMA_VID_PCP_SHIFT	0xD
+
 static inline int set_av_attr(struct ocrdma_dev *dev, struct ocrdma_ah *ah,
 				struct ib_ah_attr *attr, int pdid)
 {
@@ -49,13 +51,13 @@ static inline int set_av_attr(struct ocrdma_dev *dev, struct ocrdma_ah *ah,
 
 	ah->sgid_index = attr->grh.sgid_index;
 
-	vlan_tag = rdma_get_vlan_id(&attr->grh.dgid);
+	vlan_tag = attr->vlan_id;
 	if (!vlan_tag || (vlan_tag > 0xFFF))
 		vlan_tag = dev->pvid;
 	if (vlan_tag && (vlan_tag < 0x1000)) {
 		eth.eth_type = cpu_to_be16(0x8100);
 		eth.roce_eth_type = cpu_to_be16(OCRDMA_ROCE_ETH_TYPE);
-		vlan_tag |= (attr->sl & 7) << 13;
+		vlan_tag |= (dev->sl & 0x07) << OCRDMA_VID_PCP_SHIFT;
 		eth.vlan_tag = cpu_to_be16(vlan_tag);
 		eth_sz = sizeof(struct ocrdma_eth_vlan);
 		vlan_enabled = true;
@@ -64,7 +66,8 @@ static inline int set_av_attr(struct ocrdma_dev *dev, struct ocrdma_ah *ah,
 		eth_sz = sizeof(struct ocrdma_eth_basic);
 	}
 	memcpy(&eth.smac[0], &dev->nic_info.mac_addr[0], ETH_ALEN);
-	status = ocrdma_resolve_dgid(dev, &attr->grh.dgid, &eth.dmac[0]);
+	memcpy(&eth.dmac[0], attr->dmac, ETH_ALEN);
+	status = ocrdma_resolve_dmac(dev, attr, &eth.dmac[0]);
 	if (status)
 		return status;
 	status = ocrdma_query_gid(&dev->ibdev, 1, attr->grh.sgid_index,
@@ -84,6 +87,7 @@ static inline int set_av_attr(struct ocrdma_dev *dev, struct ocrdma_ah *ah,
 	memcpy((u8 *)ah->av + eth_sz, &grh, sizeof(struct ocrdma_grh));
 	if (vlan_enabled)
 		ah->av->valid |= OCRDMA_AV_VLAN_VALID;
+	ah->av->valid = cpu_to_le32(ah->av->valid);
 	return status;
 }
 
@@ -98,7 +102,9 @@ struct ib_ah *ocrdma_create_ah(struct ib_pd *ibpd, struct ib_ah_attr *attr)
 	if (!(attr->ah_flags & IB_AH_GRH))
 		return ERR_PTR(-EINVAL);
 
-	ah = kzalloc(sizeof *ah, GFP_ATOMIC);
+	if (atomic_cmpxchg(&dev->update_sl, 1, 0))
+		ocrdma_init_service_level(dev);
+	ah = kzalloc(sizeof(*ah), GFP_ATOMIC);
 	if (!ah)
 		return ERR_PTR(-ENOMEM);
 

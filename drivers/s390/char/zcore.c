@@ -17,6 +17,8 @@
 #include <linux/miscdevice.h>
 #include <linux/debugfs.h>
 #include <linux/module.h>
+#include <linux/memblock.h>
+
 #include <asm/asm-offsets.h>
 #include <asm/ipl.h>
 #include <asm/sclp.h>
@@ -328,9 +330,9 @@ static ssize_t zcore_read(struct file *file, char __user *buf, size_t count,
 	mem_offs = 0;
 
 	/* Copy from HSA data */
-	if (*ppos < (ZFCPDUMP_HSA_SIZE + HEADER_SIZE)) {
-		size = min((count - hdr_count), (size_t) (ZFCPDUMP_HSA_SIZE
-			   - mem_start));
+	if (*ppos < sclp_get_hsa_size() + HEADER_SIZE) {
+		size = min((count - hdr_count),
+			   (size_t) (sclp_get_hsa_size() - mem_start));
 		rc = memcpy_hsa_user(buf + hdr_count, mem_start, size);
 		if (rc)
 			goto fail;
@@ -411,33 +413,24 @@ static ssize_t zcore_memmap_read(struct file *filp, char __user *buf,
 				 size_t count, loff_t *ppos)
 {
 	return simple_read_from_buffer(buf, count, ppos, filp->private_data,
-				       MEMORY_CHUNKS * CHUNK_INFO_SIZE);
+				       memblock.memory.cnt * CHUNK_INFO_SIZE);
 }
 
 static int zcore_memmap_open(struct inode *inode, struct file *filp)
 {
-	int i;
+	struct memblock_region *reg;
 	char *buf;
-	struct mem_chunk *chunk_array;
+	int i = 0;
 
-	chunk_array = kzalloc(MEMORY_CHUNKS * sizeof(struct mem_chunk),
-			      GFP_KERNEL);
-	if (!chunk_array)
-		return -ENOMEM;
-	detect_memory_layout(chunk_array, 0);
-	buf = kzalloc(MEMORY_CHUNKS * CHUNK_INFO_SIZE, GFP_KERNEL);
+	buf = kzalloc(memblock.memory.cnt * CHUNK_INFO_SIZE, GFP_KERNEL);
 	if (!buf) {
-		kfree(chunk_array);
 		return -ENOMEM;
 	}
-	for (i = 0; i < MEMORY_CHUNKS; i++) {
-		sprintf(buf + (i * CHUNK_INFO_SIZE), "%016llx %016llx ",
-			(unsigned long long) chunk_array[i].addr,
-			(unsigned long long) chunk_array[i].size);
-		if (chunk_array[i].size == 0)
-			break;
+	for_each_memblock(memory, reg) {
+		sprintf(buf + (i++ * CHUNK_INFO_SIZE), "%016llx %016llx ",
+			(unsigned long long) reg->base,
+			(unsigned long long) reg->size);
 	}
-	kfree(chunk_array);
 	filp->private_data = buf;
 	return nonseekable_open(inode, filp);
 }
@@ -490,7 +483,7 @@ static ssize_t zcore_hsa_read(struct file *filp, char __user *buf,
 	static char str[18];
 
 	if (hsa_available)
-		snprintf(str, sizeof(str), "%lx\n", ZFCPDUMP_HSA_SIZE);
+		snprintf(str, sizeof(str), "%lx\n", sclp_get_hsa_size());
 	else
 		snprintf(str, sizeof(str), "0\n");
 	return simple_read_from_buffer(buf, count, ppos, str, strlen(str));
@@ -584,38 +577,21 @@ static int __init sys_info_init(enum arch_id arch, unsigned long mem_end)
 
 static int __init check_sdias(void)
 {
-	int rc, act_hsa_size;
-
-	rc = sclp_sdias_blk_count();
-	if (rc < 0) {
+	if (!sclp_get_hsa_size()) {
 		TRACE("Could not determine HSA size\n");
-		return rc;
-	}
-	act_hsa_size = (rc - 1) * PAGE_SIZE;
-	if (act_hsa_size < ZFCPDUMP_HSA_SIZE) {
-		TRACE("HSA size too small: %i\n", act_hsa_size);
-		return -EINVAL;
+		return -ENODEV;
 	}
 	return 0;
 }
 
 static int __init get_mem_info(unsigned long *mem, unsigned long *end)
 {
-	int i;
-	struct mem_chunk *chunk_array;
+	struct memblock_region *reg;
 
-	chunk_array = kzalloc(MEMORY_CHUNKS * sizeof(struct mem_chunk),
-			      GFP_KERNEL);
-	if (!chunk_array)
-		return -ENOMEM;
-	detect_memory_layout(chunk_array, 0);
-	for (i = 0; i < MEMORY_CHUNKS; i++) {
-		if (chunk_array[i].size == 0)
-			break;
-		*mem += chunk_array[i].size;
-		*end = max(*end, chunk_array[i].addr + chunk_array[i].size);
+	for_each_memblock(memory, reg) {
+		*mem += reg->size;
+		*end = max_t(unsigned long, *end, reg->base + reg->size);
 	}
-	kfree(chunk_array);
 	return 0;
 }
 
@@ -662,7 +638,7 @@ static int __init zcore_reipl_init(void)
 	ipl_block = (void *) __get_free_page(GFP_KERNEL);
 	if (!ipl_block)
 		return -ENOMEM;
-	if (ipib_info.ipib < ZFCPDUMP_HSA_SIZE)
+	if (ipib_info.ipib < sclp_get_hsa_size())
 		rc = memcpy_hsa_kernel(ipl_block, ipib_info.ipib, PAGE_SIZE);
 	else
 		rc = memcpy_real(ipl_block, (void *) ipib_info.ipib, PAGE_SIZE);

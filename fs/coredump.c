@@ -40,7 +40,6 @@
 
 #include <trace/events/task.h>
 #include "internal.h"
-#include "coredump.h"
 
 #include <trace/events/sched.h>
 
@@ -74,10 +73,15 @@ static int expand_corename(struct core_name *cn, int size)
 static int cn_vprintf(struct core_name *cn, const char *fmt, va_list arg)
 {
 	int free, need;
+	va_list arg_copy;
 
 again:
 	free = cn->size - cn->used;
-	need = vsnprintf(cn->corename + cn->used, free, fmt, arg);
+
+	va_copy(arg_copy, arg);
+	need = vsnprintf(cn->corename + cn->used, free, fmt, arg_copy);
+	va_end(arg_copy);
+
 	if (need < free) {
 		cn->used += need;
 		return 0;
@@ -302,7 +306,7 @@ static int zap_threads(struct task_struct *tsk, struct mm_struct *mm,
 	if (unlikely(nr < 0))
 		return nr;
 
-	tsk->flags = PF_DUMPCORE;
+	tsk->flags |= PF_DUMPCORE;
 	if (atomic_read(&mm->mm_users) == nr + 1)
 		goto done;
 	/*
@@ -695,7 +699,7 @@ int dump_emit(struct coredump_params *cprm, const void *addr, int nr)
 	while (nr) {
 		if (dump_interrupted())
 			return 0;
-		n = vfs_write(file, addr, nr, &pos);
+		n = __kernel_write(file, addr, nr, &pos);
 		if (n <= 0)
 			return 0;
 		file->f_pos = pos;
@@ -733,7 +737,7 @@ int dump_align(struct coredump_params *cprm, int align)
 {
 	unsigned mod = cprm->written & (align - 1);
 	if (align & (align - 1))
-		return -EINVAL;
-	return mod ? dump_skip(cprm, align - mod) : 0;
+		return 0;
+	return mod ? dump_skip(cprm, align - mod) : 1;
 }
 EXPORT_SYMBOL(dump_align);

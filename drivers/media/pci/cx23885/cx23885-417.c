@@ -427,7 +427,7 @@ int mc417_register_read(struct cx23885_dev *dev, u16 address, u32 *value)
 	cx_write(MC417_RWD, regval);
 
 	/* Transition RD to effect read transaction across bus.
-	 * Transtion 0x5000 -> 0x9000 correct (RD/RDY -> WR/RDY)?
+	 * Transition 0x5000 -> 0x9000 correct (RD/RDY -> WR/RDY)?
 	 * Should it be 0x9000 -> 0xF000 (also why is RDY being set, its
 	 * input only...)
 	 */
@@ -1266,7 +1266,7 @@ static int vidioc_g_tuner(struct file *file, void *priv,
 	struct cx23885_fh  *fh  = file->private_data;
 	struct cx23885_dev *dev = fh->dev;
 
-	if (UNSET == dev->tuner_type)
+	if (dev->tuner_type == TUNER_ABSENT)
 		return -EINVAL;
 	if (0 != t->index)
 		return -EINVAL;
@@ -1284,7 +1284,7 @@ static int vidioc_s_tuner(struct file *file, void *priv,
 	struct cx23885_fh  *fh  = file->private_data;
 	struct cx23885_dev *dev = fh->dev;
 
-	if (UNSET == dev->tuner_type)
+	if (dev->tuner_type == TUNER_ABSENT)
 		return -EINVAL;
 
 	/* Update the A/V core */
@@ -1299,7 +1299,7 @@ static int vidioc_g_frequency(struct file *file, void *priv,
 	struct cx23885_fh  *fh  = file->private_data;
 	struct cx23885_dev *dev = fh->dev;
 
-	if (UNSET == dev->tuner_type)
+	if (dev->tuner_type == TUNER_ABSENT)
 		return -EINVAL;
 	f->type = V4L2_TUNER_ANALOG_TV;
 	f->frequency = dev->freq;
@@ -1347,7 +1347,7 @@ static int vidioc_querycap(struct file *file, void  *priv,
 		V4L2_CAP_READWRITE     |
 		V4L2_CAP_STREAMING     |
 		0;
-	if (UNSET != dev->tuner_type)
+	if (dev->tuner_type != TUNER_ABSENT)
 		cap->capabilities |= V4L2_CAP_TUNER;
 
 	return 0;

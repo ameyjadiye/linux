@@ -125,7 +125,7 @@ int vdso_alloc_per_cpu(struct _lowcore *lowcore)
 		psal[i] = 0x80000000;
 
 	lowcore->paste[4] = (u32)(addr_t) psal;
-	psal[0] = 0x20000000;
+	psal[0] = 0x02000000;
 	psal[2] = (u32)(addr_t) aste;
 	*(unsigned long *) (aste + 2) = segment_table +
 		_ASCE_TABLE_LENGTH + _ASCE_USER_BITS + _ASCE_TYPE_SEGMENT;
@@ -316,18 +316,3 @@ static int __init vdso_init(void)
 	return 0;
 }
 early_initcall(vdso_init);
-
-int in_gate_area_no_mm(unsigned long addr)
-{
-	return 0;
-}
-
-int in_gate_area(struct mm_struct *mm, unsigned long addr)
-{
-	return 0;
-}
-
-struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
-{
-	return NULL;
-}

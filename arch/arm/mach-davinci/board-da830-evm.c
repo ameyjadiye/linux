@@ -17,7 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
 #include <linux/i2c/pcf857x.h>
-#include <linux/i2c/at24.h>
+#include <linux/platform_data/at24.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/spi/spi.h>
@@ -418,6 +418,9 @@ static inline void da830_evm_init_nand(int mux_mode)
 	ret = platform_device_register(&da830_evm_nand_device);
 	if (ret)
 		pr_warning("da830_evm_init: NAND device not registered.\n");
+
+	if (davinci_aemif_setup(&da830_evm_nand_device))
+		pr_warn("%s: Cannot configure AEMIF.\n", __func__);
 
 	gpio_direction_output(mux_mode, 1);
 }

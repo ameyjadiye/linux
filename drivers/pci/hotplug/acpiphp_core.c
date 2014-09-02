@@ -63,10 +63,6 @@ MODULE_LICENSE("GPL");
 MODULE_PARM_DESC(disable, "disable acpiphp driver");
 module_param_named(disable, acpiphp_disabled, bool, 0444);
 
-/* export the attention callback registration methods */
-EXPORT_SYMBOL_GPL(acpiphp_register_attention);
-EXPORT_SYMBOL_GPL(acpiphp_unregister_attention);
-
 static int enable_slot		(struct hotplug_slot *slot);
 static int disable_slot		(struct hotplug_slot *slot);
 static int set_attention_status (struct hotplug_slot *slot, u8 value);
@@ -104,6 +100,7 @@ int acpiphp_register_attention(struct acpiphp_attention_info *info)
 	}
 	return retval;
 }
+EXPORT_SYMBOL_GPL(acpiphp_register_attention);
 
 
 /**
@@ -111,7 +108,7 @@ int acpiphp_register_attention(struct acpiphp_attention_info *info)
  * @info: must match the pointer used to register
  *
  * Description: This is used to un-register a hardware specific acpi
- * driver that manipulates the attention LED.  The pointer to the 
+ * driver that manipulates the attention LED.  The pointer to the
  * info struct must be the same as the one used to set it.
  */
 int acpiphp_unregister_attention(struct acpiphp_attention_info *info)
@@ -124,6 +121,7 @@ int acpiphp_unregister_attention(struct acpiphp_attention_info *info)
 	}
 	return retval;
 }
+EXPORT_SYMBOL_GPL(acpiphp_unregister_attention);
 
 
 /**
@@ -156,7 +154,7 @@ static int disable_slot(struct hotplug_slot *hotplug_slot)
 	pr_debug("%s - physical_slot = %s\n", __func__, slot_name(slot));
 
 	/* disable the specified slot */
-	return acpiphp_disable_and_eject_slot(slot->acpi_slot);
+	return acpiphp_disable_slot(slot->acpi_slot);
 }
 
 
@@ -169,8 +167,8 @@ static int disable_slot(struct hotplug_slot *hotplug_slot)
  * was registered with us.  This allows hardware specific
  * ACPI implementations to blink the light for us.
  */
- static int set_attention_status(struct hotplug_slot *hotplug_slot, u8 status)
- {
+static int set_attention_status(struct hotplug_slot *hotplug_slot, u8 status)
+{
 	int retval = -ENODEV;
 
 	pr_debug("%s - physical_slot = %s\n", __func__,
@@ -182,8 +180,8 @@ static int disable_slot(struct hotplug_slot *hotplug_slot)
 	} else
 		attention_info = NULL;
 	return retval;
- }
- 
+}
+
 
 /**
  * get_power_status - get power status of a slot
@@ -323,7 +321,7 @@ int acpiphp_register_hotplug_slot(struct acpiphp_slot *acpiphp_slot,
 	if (retval) {
 		pr_err("pci_hp_register failed with error %d\n", retval);
 		goto error_hpslot;
- 	}
+	}
 
 	pr_info("Slot [%s] registered\n", slot_name(slot));
 

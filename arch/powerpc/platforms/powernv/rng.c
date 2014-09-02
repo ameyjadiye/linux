@@ -19,6 +19,7 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
+#include <asm/smp.h>
 
 
 struct powernv_rng {
@@ -122,4 +123,4 @@ static __init int rng_init(void)
 
 	return 0;
 }
-subsys_initcall(rng_init);
+machine_subsys_initcall(powernv, rng_init);

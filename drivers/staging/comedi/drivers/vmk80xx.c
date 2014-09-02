@@ -465,7 +465,7 @@ static int vmk80xx_do_insn_bits(struct comedi_device *dev,
 	unsigned char *rx_buf = devpriv->usb_rx_buf;
 	unsigned char *tx_buf = devpriv->usb_tx_buf;
 	int reg, cmd;
-	int ret;
+	int ret = 0;
 
 	if (devpriv->model == VMK8061_MODEL) {
 		reg = VMK8061_DO_REG;
@@ -959,5 +959,4 @@ module_comedi_usb_driver(vmk80xx_driver, vmk80xx_usb_driver);
 MODULE_AUTHOR("Manuel Gebele <forensixs@gmx.de>");
 MODULE_DESCRIPTION("Velleman USB Board Low-Level Driver");
 MODULE_SUPPORTED_DEVICE("K8055/K8061 aka VM110/VM140");
-MODULE_VERSION("0.8.01");
 MODULE_LICENSE("GPL");

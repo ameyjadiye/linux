@@ -356,7 +356,7 @@ static int vidioc_s_frequency(struct file *file, void *priv,
 		   So we keep it as-is. */
 		return -EINVAL;
 	}
-	clamp(freq, FREQ_MIN * FREQ_MUL, FREQ_MAX * FREQ_MUL);
+	freq = clamp(freq, FREQ_MIN * FREQ_MUL, FREQ_MAX * FREQ_MUL);
 	tea5764_power_up(radio);
 	tea5764_tune(radio, (freq * 125) / 2);
 	return 0;
@@ -478,7 +478,6 @@ static int tea5764_i2c_probe(struct i2c_client *client,
 	video_set_drvdata(&radio->vdev, radio);
 	radio->vdev.lock = &radio->mutex;
 	radio->vdev.v4l2_dev = v4l2_dev;
-	set_bit(V4L2_FL_USE_FH_PRIO, &radio->vdev.flags);
 
 	/* initialize and power off the chip */
 	tea5764_i2c_read(radio);

@@ -13,6 +13,7 @@
 #include <linux/of.h>
 #include <asm/archrandom.h>
 #include <asm/machdep.h>
+#include <asm/plpar_wrappers.h>
 
 
 static int pseries_get_random_long(unsigned long *v)
@@ -41,4 +42,4 @@ static __init int rng_init(void)
 
 	return 0;
 }
-subsys_initcall(rng_init);
+machine_subsys_initcall(pseries, rng_init);

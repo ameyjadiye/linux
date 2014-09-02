@@ -1010,10 +1010,11 @@ static int udf_symlink(struct inode *dir, struct dentry *dentry,
 	else
 		udf_truncate_tail_extent(inode);
 	mark_inode_dirty(inode);
+	up_write(&iinfo->i_data_sem);
 
 	fi = udf_add_entry(dir, dentry, &fibh, &cfi, &err);
 	if (!fi)
-		goto out_no_entry;
+		goto out_fail;
 	cfi.icb.extLength = cpu_to_le32(sb->s_blocksize);
 	cfi.icb.extLocation = cpu_to_lelb(iinfo->i_location);
 	if (UDF_SB(inode->i_sb)->s_lvid_bh) {
@@ -1023,7 +1024,6 @@ static int udf_symlink(struct inode *dir, struct dentry *dentry,
 	udf_write_fi(dir, &cfi, fi, &fibh, NULL, NULL);
 	if (UDF_I(dir)->i_alloc_type == ICBTAG_FLAG_AD_IN_ICB)
 		mark_inode_dirty(dir);
-	up_write(&iinfo->i_data_sem);
 	if (fibh.sbh != fibh.ebh)
 		brelse(fibh.ebh);
 	brelse(fibh.sbh);
@@ -1036,6 +1036,7 @@ out:
 
 out_no_entry:
 	up_write(&iinfo->i_data_sem);
+out_fail:
 	inode_dec_link_count(inode);
 	iput(inode);
 	goto out;

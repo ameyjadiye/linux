@@ -92,7 +92,7 @@ nft_target_set_tgchk_param(struct xt_tgchk_param *par,
 	if (ctx->chain->flags & NFT_BASE_CHAIN) {
 		const struct nft_base_chain *basechain =
 						nft_base_chain(ctx->chain);
-		const struct nf_hook_ops *ops = &basechain->ops;
+		const struct nf_hook_ops *ops = &basechain->ops[0];
 
 		par->hook_mask = 1 << ops->hooknum;
 	}
@@ -128,7 +128,7 @@ static const struct nla_policy nft_rule_compat_policy[NFTA_RULE_COMPAT_MAX + 1] 
 	[NFTA_RULE_COMPAT_FLAGS]	= { .type = NLA_U32 },
 };
 
-static u8 nft_parse_compat(const struct nlattr *attr, bool *inv)
+static int nft_parse_compat(const struct nlattr *attr, u8 *proto, bool *inv)
 {
 	struct nlattr *tb[NFTA_RULE_COMPAT_MAX+1];
 	u32 flags;
@@ -148,7 +148,8 @@ static u8 nft_parse_compat(const struct nlattr *attr, bool *inv)
 	if (flags & NFT_RULE_COMPAT_F_INV)
 		*inv = true;
 
-	return ntohl(nla_get_be32(tb[NFTA_RULE_COMPAT_PROTO]));
+	*proto = ntohl(nla_get_be32(tb[NFTA_RULE_COMPAT_PROTO]));
+	return 0;
 }
 
 static int
@@ -166,8 +167,11 @@ nft_target_init(const struct nft_ctx *ctx, const struct nft_expr *expr,
 
 	target_compat_from_user(target, nla_data(tb[NFTA_TARGET_INFO]), info);
 
-	if (ctx->nla[NFTA_RULE_COMPAT])
-		proto = nft_parse_compat(ctx->nla[NFTA_RULE_COMPAT], &inv);
+	if (ctx->nla[NFTA_RULE_COMPAT]) {
+		ret = nft_parse_compat(ctx->nla[NFTA_RULE_COMPAT], &proto, &inv);
+		if (ret < 0)
+			goto err;
+	}
 
 	nft_target_set_tgchk_param(&par, ctx, target, info, &e, proto, inv);
 
@@ -188,9 +192,18 @@ err:
 }
 
 static void
-nft_target_destroy(const struct nft_expr *expr)
+nft_target_destroy(const struct nft_ctx *ctx, const struct nft_expr *expr)
 {
 	struct xt_target *target = expr->ops->data;
+	void *info = nft_expr_priv(expr);
+	struct xt_tgdtor_param par;
+
+	par.net = ctx->net;
+	par.target = target;
+	par.targinfo = info;
+	par.family = ctx->afi->family;
+	if (par.target->destroy != NULL)
+		par.target->destroy(&par);
 
 	module_put(target->me);
 }
@@ -249,7 +262,7 @@ static int nft_target_validate(const struct nft_ctx *ctx,
 	if (ctx->chain->flags & NFT_BASE_CHAIN) {
 		const struct nft_base_chain *basechain =
 						nft_base_chain(ctx->chain);
-		const struct nf_hook_ops *ops = &basechain->ops;
+		const struct nf_hook_ops *ops = &basechain->ops[0];
 
 		hook_mask = 1 << ops->hooknum;
 		if (hook_mask & target->hooks)
@@ -319,7 +332,7 @@ nft_match_set_mtchk_param(struct xt_mtchk_param *par, const struct nft_ctx *ctx,
 	if (ctx->chain->flags & NFT_BASE_CHAIN) {
 		const struct nft_base_chain *basechain =
 						nft_base_chain(ctx->chain);
-		const struct nf_hook_ops *ops = &basechain->ops;
+		const struct nf_hook_ops *ops = &basechain->ops[0];
 
 		par->hook_mask = 1 << ops->hooknum;
 	}
@@ -356,8 +369,11 @@ nft_match_init(const struct nft_ctx *ctx, const struct nft_expr *expr,
 
 	match_compat_from_user(match, nla_data(tb[NFTA_MATCH_INFO]), info);
 
-	if (ctx->nla[NFTA_RULE_COMPAT])
-		proto = nft_parse_compat(ctx->nla[NFTA_RULE_COMPAT], &inv);
+	if (ctx->nla[NFTA_RULE_COMPAT]) {
+		ret = nft_parse_compat(ctx->nla[NFTA_RULE_COMPAT], &proto, &inv);
+		if (ret < 0)
+			goto err;
+	}
 
 	nft_match_set_mtchk_param(&par, ctx, match, info, &e, proto, inv);
 
@@ -372,9 +388,18 @@ err:
 }
 
 static void
-nft_match_destroy(const struct nft_expr *expr)
+nft_match_destroy(const struct nft_ctx *ctx, const struct nft_expr *expr)
 {
 	struct xt_match *match = expr->ops->data;
+	void *info = nft_expr_priv(expr);
+	struct xt_mtdtor_param par;
+
+	par.net = ctx->net;
+	par.match = match;
+	par.matchinfo = info;
+	par.family = ctx->afi->family;
+	if (par.match->destroy != NULL)
+		par.match->destroy(&par);
 
 	module_put(match->me);
 }
@@ -442,7 +467,7 @@ static int nft_match_validate(const struct nft_ctx *ctx,
 	if (ctx->chain->flags & NFT_BASE_CHAIN) {
 		const struct nft_base_chain *basechain =
 						nft_base_chain(ctx->chain);
-		const struct nf_hook_ops *ops = &basechain->ops;
+		const struct nf_hook_ops *ops = &basechain->ops[0];
 
 		hook_mask = 1 << ops->hooknum;
 		if (hook_mask & match->hooks)

@@ -36,26 +36,51 @@ config NF_CONNTRACK_PROC_COMPAT
 
 	  If unsure, say Y.
 
+config NF_LOG_ARP
+	tristate "ARP packet logging"
+	default m if NETFILTER_ADVANCED=n
+	select NF_LOG_COMMON
+
+config NF_LOG_IPV4
+	tristate "IPv4 packet logging"
+	default m if NETFILTER_ADVANCED=n
+	select NF_LOG_COMMON
+
 config NF_TABLES_IPV4
 	depends on NF_TABLES
 	tristate "IPv4 nf_tables support"
-
-config NFT_REJECT_IPV4
-	depends on NF_TABLES_IPV4
-	tristate "nf_tables IPv4 reject support"
+	help
+	  This option enables the IPv4 support for nf_tables.
 
 config NFT_CHAIN_ROUTE_IPV4
 	depends on NF_TABLES_IPV4
 	tristate "IPv4 nf_tables route chain support"
+	help
+	  This option enables the "route" chain for IPv4 in nf_tables. This
+	  chain type is used to force packet re-routing after mangling header
+	  fields such as the source, destination, type of service and
+	  the packet mark.
 
 config NFT_CHAIN_NAT_IPV4
 	depends on NF_TABLES_IPV4
 	depends on NF_NAT_IPV4 && NFT_NAT
 	tristate "IPv4 nf_tables nat chain support"
+	help
+	  This option enables the "nat" chain for IPv4 in nf_tables. This
+	  chain type is used to perform Network Address Translation (NAT)
+	  packet transformations such as the source, destination address and
+	  source and destination ports.
+
+config NFT_REJECT_IPV4
+	depends on NF_TABLES_IPV4
+	default NFT_REJECT
+	tristate
 
 config NF_TABLES_ARP
 	depends on NF_TABLES
 	tristate "ARP nf_tables support"
+	help
+	  This option enables the ARP support for nf_tables.
 
 config IP_NF_IPTABLES
 	tristate "IP tables support (required for filtering/masq/NAT)"
@@ -143,25 +168,6 @@ config IP_NF_TARGET_SYNPROXY
 	  during SYN-flood attacks.
 
 	  To compile it as a module, choose M here. If unsure, say N.
-
-config IP_NF_TARGET_ULOG
-	tristate "ULOG target support (obsolete)"
-	default m if NETFILTER_ADVANCED=n
-	---help---
-
-	  This option enables the old IPv4-only "ipt_ULOG" implementation
-	  which has been obsoleted by the new "nfnetlink_log" code (see
-	  CONFIG_NETFILTER_NETLINK_LOG).
-
-	  This option adds a `ULOG' target, which allows you to create rules in
-	  any iptables table. The packet is passed to a userspace logging
-	  daemon using netlink multicast sockets; unlike the LOG target
-	  which can only be viewed through syslog.
-
-	  The appropriate userspace logging daemon (ulogd) may be obtained from
-	  <http://www.netfilter.org/projects/ulogd/index.html>
-
-	  To compile it as a module, choose M here.  If unsure, say N.
 
 # NAT + specific targets: nf_conntrack
 config NF_NAT_IPV4

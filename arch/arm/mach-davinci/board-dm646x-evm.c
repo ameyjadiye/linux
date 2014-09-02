@@ -22,7 +22,7 @@
 #include <linux/gpio.h>
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
-#include <linux/i2c/at24.h>
+#include <linux/platform_data/at24.h>
 #include <linux/i2c/pcf857x.h>
 
 #include <media/tvp514x.h>
@@ -804,6 +804,9 @@ static __init void evm_init(void)
 		davinci_nand_data.timing = &dm6467tevm_nandflash_timing;
 
 	platform_device_register(&davinci_nand_device);
+
+	if (davinci_aemif_setup(&davinci_nand_device))
+		pr_warn("%s: Cannot configure AEMIF.\n", __func__);
 
 	dm646x_init_edma(dm646x_edma_rsv);
 
